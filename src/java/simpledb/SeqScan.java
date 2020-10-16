@@ -46,7 +46,7 @@ public class SeqScan implements OpIterator {
      * be the actual name of the table in the catalog of the database
      */
     public String getTableName() {
-        return null;
+        return Database.getCatalog().getTableName(tableId);
     }
 
     /**
@@ -70,6 +70,8 @@ public class SeqScan implements OpIterator {
      */
     public void reset(int tableid, String tableAlias) {
         // some code goes here
+        tableId = tableid;
+        alias = tableAlias;
     }
 
 
