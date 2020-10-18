@@ -23,8 +23,8 @@ public class Join extends Operator {
     JoinPredicate joinPredicate;
     OpIterator child1;
     OpIterator child2;
-
     TupleDesc tupleDesc;
+
 
     public Join(JoinPredicate p, OpIterator child1, OpIterator child2) {
         // some code goes here
@@ -72,8 +72,13 @@ public class Join extends Operator {
         super.open();
         child1.open();
         child2.open();
+        lefts = getNextBlock(child1);
+        rights = getNextBlock(child2);
 
-
+//        System.out.println(joinPredicate);
+        tupleIterator = getTupleIterator(lefts, rights);
+        tupleIterator.open();
+//        throw new DbException("TND");
 
     }
 
@@ -82,12 +87,15 @@ public class Join extends Operator {
         super.close();
         child1.close();
         child2.close();
+        tupleIterator.close();
     }
 
     public void rewind() throws DbException, TransactionAbortedException {
         // some code goes here
         child1.rewind();
         child2.rewind();
+        tupleIterator.close();
+        this.open();
     }
 
     /**
@@ -110,17 +118,115 @@ public class Join extends Operator {
      */
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
         // some code goes here
+        if (tupleIterator.hasNext()) {
+            return tupleIterator.next();
+        }
+        if (child2.hasNext()) {
+            rights = getNextBlock(child2);
+            tupleIterator = getTupleIterator(lefts, rights);
+            tupleIterator.open();
+            return tupleIterator.next();
+        } else if (child1.hasNext()) {
+            lefts = getNextBlock(child1);
+            child2.rewind();
+            rights = getNextBlock(child2);
+            tupleIterator = getTupleIterator(lefts, rights);
+            tupleIterator.open();
+            return tupleIterator.next();
+        }
         return null;
+    }
+
+    private void updateNewTuple(Tuple newTuple, int fieldNo, int startPos, Field field) {
+        newTuple.setField(fieldNo + startPos, field);
+    }
+
+    private Tuple mergeTuple(Tuple tuple1, Tuple tuple2) {
+        Tuple tuple = new Tuple(tupleDesc);
+        int length1 = child1.getTupleDesc().numFields();
+        int length2 = child2.getTupleDesc().numFields();
+        for (int i = 0; i < length1; i++) {
+            updateNewTuple(tuple, i, 0, tuple1.getField(i));
+        }
+        for (int i = 0; i < length2; i++) {
+            updateNewTuple(tuple, i, length1, tuple2.getField(i));
+        }
+        return tuple;
+    }
+
+    private final int blockMemory = (1 << 20);
+
+    private boolean notOrdered(ArrayList<Tuple> tuples, int fieldId) {
+        for (int i = 0; i < tuples.size() - 1; i++) {
+            if (tuples.get(i).getField(fieldId).compare(Predicate.Op.GREATER_THAN, tuples.get(i + 1).getField(fieldId))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    TupleIterator tupleIterator;
+    ArrayList<Tuple> lefts;
+    ArrayList<Tuple> rights;
+
+    private ArrayList<Tuple> getNextBlock(OpIterator child) throws DbException, TransactionAbortedException {
+        int blockSize = blockMemory / child.getTupleDesc().getSize();
+        ArrayList<Tuple> nextBlock = new ArrayList<>(blockSize);
+        int count = 0;
+        while (child.hasNext() && count < blockSize) {
+            nextBlock.add(child.next());
+            count++;
+        }
+        return nextBlock;
+    }
+
+    TupleIterator getTupleIterator(ArrayList<Tuple> lefts, ArrayList<Tuple> rights) {
+        if (notOrdered(lefts, getJoinPredicate().field1)) {
+            lefts.sort(new TupleComparator(getJoinPredicate().field1, true));
+        }
+        int cursor1 = 0;
+        if (notOrdered(rights, getJoinPredicate().field2)) {
+            rights.sort(new TupleComparator(getJoinPredicate().field2, true));
+        }
+        int cursor2 = 0;
+
+        LinkedList<Tuple> result = new LinkedList<>();
+        while (cursor1 < lefts.size() && cursor2 < rights.size()) {
+            if (lefts.get(cursor1).getField(getJoinPredicate().getField1()).compare(joinPredicate.op, rights.get(cursor2).getField(getJoinPredicate().field2))) {
+                advance(result, lefts.get(cursor1), rights, cursor2);
+                cursor1++;
+            } else if (lefts.get(cursor1).getField(getJoinPredicate().getField1()).compare(Predicate.Op.LESS_THAN_OR_EQ, rights.get(cursor2).getField(getJoinPredicate().field2))) {
+                cursor1++;
+            } else if (lefts.get(cursor1).getField(getJoinPredicate().getField1()).compare(Predicate.Op.GREATER_THAN_OR_EQ, rights.get(cursor2).getField(getJoinPredicate().field2))) {
+                cursor2++;
+            }
+        }
+        return new TupleIterator(getTupleDesc(), result);
+    }
+
+    void advance(LinkedList<Tuple> result, Tuple leftTuple, ArrayList<Tuple> rights, int cursor2) {
+        for (int i = cursor2; i < rights.size(); i++) {
+            Tuple rightTuple = rights.get(i);
+            if (leftTuple.getField(getJoinPredicate().getField1()).compare(getJoinPredicate().getOperator(), rightTuple.getField(getJoinPredicate().field2))) {
+                result.add(mergeTuple(leftTuple, rightTuple));
+            } else {
+                return;
+            }
+        }
     }
 
     @Override
     public OpIterator[] getChildren() {
         // some code goes here
-        return null;
+        return new OpIterator[]{child1, child2};
     }
 
     @Override
     public void setChildren(OpIterator[] children) {
         // some code goes here
+        if (children.length == 2) {
+            child1 = children[0];
+            child2 = children[1];
+        }
     }
 }

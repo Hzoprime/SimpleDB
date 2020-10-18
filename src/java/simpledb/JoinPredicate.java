@@ -13,7 +13,7 @@ public class JoinPredicate implements Serializable {
     /**
      * Constructor -- create a new predicate over two fields of two tuples.
      *
-     * @param field1
+     * @param field1a
      * The field index into the first tuple in the predicate
      * @param field2
      * The field index into the second tuple in the predicate
@@ -59,5 +59,14 @@ public class JoinPredicate implements Serializable {
     public Predicate.Op getOperator() {
         // some code goes here
         return op;
+    }
+
+    @Override
+    public String toString() {
+        return "JoinPredicate{" +
+                "field1=" + field1 +
+                ", op=" + op +
+                ", field2=" + field2 +
+                '}';
     }
 }

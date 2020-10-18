@@ -81,8 +81,10 @@ public class TupleDesc implements Serializable {
         // some code goes here
         String[] fieldNames = fieldAr;
         if (fieldNames == null) {
-            AtomicInteger integer = new AtomicInteger();
-            fieldNames = Stream.generate(() -> DEFAULT_NAME + integer.getAndIncrement()).limit(typeAr.length).toArray(String[]::new);
+//            AtomicInteger integer = new AtomicInteger();
+//            fieldNames = Stream.generate(() -> DEFAULT_NAME + integer.getAndIncrement()).limit(typeAr.length).toArray(String[]::new);
+//            fieldNames = Stream.generate(() -> null).limit(typeAr.length).toArray(String[]::new);
+            fieldNames = new String[typeAr.length];
         }
         tdItems = new TDItem[typeAr.length];
         for (int i = 0; i < typeAr.length; i++) {
@@ -101,7 +103,9 @@ public class TupleDesc implements Serializable {
     public TupleDesc(Type[] typeAr) {
         // some code goes here
         AtomicInteger integer = new AtomicInteger();
-        String[] fieldNames = Stream.generate(() -> DEFAULT_NAME + (integer.getAndIncrement())).limit(typeAr.length).toArray(String[]::new);
+//        String[] fieldNames = Stream.generate(() -> DEFAULT_NAME + (integer.getAndIncrement())).limit(typeAr.length).toArray(String[]::new);
+        String[] fieldNames = new String[typeAr.length];
+//        fieldNames = Stream.generate(() ->  (null)).limit(typeAr.length).toArray(String[]::new);
         tdItems = new TDItem[typeAr.length];
         for (int i = 0; i < typeAr.length; i++) {
             tdItems[i] = new TDItem(typeAr[i], fieldNames[i]);
@@ -129,7 +133,7 @@ public class TupleDesc implements Serializable {
      */
     public String getFieldName(int i) throws NoSuchElementException {
         // some code goes here
-        return tdItems[i].fieldName;
+        return Objects.requireNonNullElseGet(tdItems[i].fieldName, () -> DEFAULT_NAME + i);
     }
 
     /**
@@ -223,9 +227,16 @@ public class TupleDesc implements Serializable {
      */
     public String toString() {
         // some code goes here
+        String[] names;
+        if (tdItems[0].fieldName == null) {
+            AtomicInteger i = new AtomicInteger();
+            names = Stream.generate(() -> DEFAULT_NAME + (i.getAndIncrement())).limit(tdItems.length).toArray(String[]::new);
+        } else {
+            names = Arrays.stream(tdItems).map(tdItem -> tdItem.fieldName).toArray(String[]::new);
+        }
         StringBuilder builder = new StringBuilder();
         for (int i = 0; i < numFields(); i++) {
-            builder.append(tdItems[i].fieldType).append("(").append(tdItems[i].fieldName).append(")");
+            builder.append(tdItems[i].fieldType).append("(").append(names[i]).append(")");
             if (i < numFields() - 1) {
                 builder.append(",");
             }
