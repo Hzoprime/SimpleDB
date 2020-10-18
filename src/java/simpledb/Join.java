@@ -12,63 +12,82 @@ public class Join extends Operator {
     /**
      * Constructor. Accepts two children to join and the predicate to join them
      * on
-     * 
+     *
      * @param p
-     *            The predicate to use to join the children
+     * The predicate to use to join the children
      * @param child1
-     *            Iterator for the left(outer) relation to join
+     * Iterator for the left(outer) relation to join
      * @param child2
-     *            Iterator for the right(inner) relation to join
+     * Iterator for the right(inner) relation to join
      */
+    JoinPredicate joinPredicate;
+    OpIterator child1;
+    OpIterator child2;
+
+    TupleDesc tupleDesc;
+
     public Join(JoinPredicate p, OpIterator child1, OpIterator child2) {
         // some code goes here
+        joinPredicate = p;
+        this.child1 = child1;
+        this.child2 = child2;
+        tupleDesc = TupleDesc.merge(child1.getTupleDesc(), child2.getTupleDesc());
     }
 
     public JoinPredicate getJoinPredicate() {
         // some code goes here
-        return null;
+        return joinPredicate;
     }
 
     /**
-     * @return
-     *       the field name of join field1. Should be quantified by
-     *       alias or table name.
-     * */
+     * @return the field name of join field1. Should be quantified by
+     * alias or table name.
+     */
     public String getJoinField1Name() {
         // some code goes here
-        return null;
+        return child1.getTupleDesc().getFieldName(joinPredicate.getField1());
     }
 
     /**
-     * @return
-     *       the field name of join field2. Should be quantified by
-     *       alias or table name.
-     * */
+     * @return the field name of join field2. Should be quantified by
+     * alias or table name.
+     */
     public String getJoinField2Name() {
         // some code goes here
-        return null;
+        return child2.getTupleDesc().getFieldName(joinPredicate.getField2());
     }
 
     /**
      * @see simpledb.TupleDesc#merge(TupleDesc, TupleDesc) for possible
-     *      implementation logic.
+     * implementation logic.
      */
     public TupleDesc getTupleDesc() {
         // some code goes here
-        return null;
+        return tupleDesc;
     }
 
     public void open() throws DbException, NoSuchElementException,
             TransactionAbortedException {
         // some code goes here
+        super.open();
+        child1.open();
+        child2.open();
+
+
+
     }
 
     public void close() {
         // some code goes here
+        super.close();
+        child1.close();
+        child2.close();
     }
 
     public void rewind() throws DbException, TransactionAbortedException {
         // some code goes here
+        child1.rewind();
+        child2.rewind();
     }
 
     /**
@@ -85,7 +104,7 @@ public class Join extends Operator {
      * <p>
      * For example, if one tuple is {1,2,3} and the other tuple is {1,5,6},
      * joined on equality of the first column, then this returns {1,2,3,1,5,6}.
-     * 
+     *
      * @return The next matching tuple.
      * @see JoinPredicate#filter
      */
@@ -104,5 +123,4 @@ public class Join extends Operator {
     public void setChildren(OpIterator[] children) {
         // some code goes here
     }
-
 }
