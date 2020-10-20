@@ -101,14 +101,11 @@ public class IntegerAggregator implements Aggregator {
     public OpIterator iterator() {
         // some code goes here
         // TODO: 2020/10/20 avg should be double, but tuple just suit integer
-        ConcurrentHashMap<Field, Integer> resultMap = new ConcurrentHashMap<>();
-        if (this.what == Op.AVG) {
-            for (Field field : countMap.keySet()) {
-                int oldValue = valueMap.get(field);
-                int count = countMap.get(field);
-                int newValue = oldValue / count;
-                resultMap.put(field, newValue);
-            }
+        ConcurrentHashMap<Field, Integer> resultMap;
+        if (this.what == Op.AVG || this.what == Op.SC_AVG) {
+            resultMap = (ConcurrentHashMap<Field, Integer>) valueMap.entrySet().stream()
+//                    .peek(x -> x.setValue(x.getValue() / countMap.get(x.getKey())))
+                    .collect(Collectors.toConcurrentMap(Map.Entry::getKey, y -> y.getValue() / countMap.get(y.getKey())));
         } else {
             resultMap = valueMap;
         }
@@ -116,30 +113,43 @@ public class IntegerAggregator implements Aggregator {
         if (this.gbfield == Aggregator.NO_GROUPING) {
             TupleDesc tupleDesc = new TupleDesc(new Type[]{Type.INT_TYPE});
             return new TupleIterator(tupleDesc,
-                    resultMap.values().stream().map(
-                            integer -> {
-                                Tuple tuple = new Tuple(tupleDesc);
-                                tuple.setField(0, new IntField(integer));
-                                return tuple;
-                            }
-                    ).collect(Collectors.toList()));
+                    resultMap.values().stream()
+                            .map(
+                                    integer -> {
+                                        Tuple tuple = new Tuple(tupleDesc);
+                                        tuple.setField(0, new IntField(integer));
+                                        return tuple;
+                                    }
+                            ).collect(Collectors.toList()));
         } else if (this.what == Op.SC_AVG || this.what == Op.SUM_COUNT) {
-            System.out.println("not in lab2");
-            return null;
+            System.out.println("sum count and sum count avg both are not in lab2");
+            TupleDesc tupleDesc = new TupleDesc(new Type[]{this.gbfieldtype, Type.INT_TYPE, Type.INT_TYPE});
+            return new TupleIterator(
+                    tupleDesc,
+                    resultMap.entrySet().stream()
+                            .map(x -> {
+                                        Tuple tuple = new Tuple(tupleDesc);
+                                        tuple.setField(0, x.getKey());
+                                        tuple.setField(1, new IntField(x.getValue()));
+                                        tuple.setField(2, new IntField(countMap.get(x.getKey())));
+                                        return tuple;
+                                    }
+                            ).collect(Collectors.toList())
+            );
         } else {
             TupleDesc tupleDesc = new TupleDesc(new Type[]{this.gbfieldtype, Type.INT_TYPE});
             return new TupleIterator(
                     tupleDesc,
-                    resultMap.entrySet().stream().sorted(
-                            Comparator.comparingDouble(Map.Entry::getValue)
-                    ).map(
-                            x -> {
-                                Tuple tuple = new Tuple(tupleDesc);
-                                tuple.setField(0, x.getKey());
-                                tuple.setField(1, new IntField(x.getValue()));
-                                return tuple;
-                            }
-                    ).collect(Collectors.toList())
+                    resultMap.entrySet().stream()
+//                            .sorted(Comparator.comparingInt(Map.Entry::getValue))
+                            .map(
+                                    x -> {
+                                        Tuple tuple = new Tuple(tupleDesc);
+                                        tuple.setField(0, x.getKey());
+                                        tuple.setField(1, new IntField(x.getValue()));
+                                        return tuple;
+                                    }
+                            ).collect(Collectors.toList())
             );
         }
     }
