@@ -34,6 +34,7 @@ public class StringAggregator implements Aggregator {
         this.gbfield = gbfield;
         this.gbfieldtype = gbfieldtype;
         this.what = what;
+
         countMap = new ConcurrentHashMap<>();
     }
 
