@@ -1,7 +1,6 @@
 package simpledb;
 
-import java.util.Arrays;
-import java.util.Comparator;
+
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -35,7 +34,6 @@ public class IntegerAggregator implements Aggregator {
     ConcurrentHashMap<Field, Integer> valueMap;
     ConcurrentHashMap<Field, Integer> countMap;
 
-    static final Field noGroupingField = new IntField(-1);
 
     public IntegerAggregator(int gbfield, Type gbfieldtype, int afield, Op what) {
         // some code goes here
@@ -111,46 +109,11 @@ public class IntegerAggregator implements Aggregator {
         }
 
         if (this.gbfield == Aggregator.NO_GROUPING) {
-            TupleDesc tupleDesc = new TupleDesc(new Type[]{Type.INT_TYPE});
-            return new TupleIterator(tupleDesc,
-                    resultMap.values().stream()
-                            .map(
-                                    integer -> {
-                                        Tuple tuple = new Tuple(tupleDesc);
-                                        tuple.setField(0, new IntField(integer));
-                                        return tuple;
-                                    }
-                            ).collect(Collectors.toList()));
+            return Aggregator.getOpIterator(resultMap);
         } else if (this.what == Op.SC_AVG || this.what == Op.SUM_COUNT) {
-            System.out.println("sum count and sum count avg both are not in lab2");
-            TupleDesc tupleDesc = new TupleDesc(new Type[]{this.gbfieldtype, Type.INT_TYPE, Type.INT_TYPE});
-            return new TupleIterator(
-                    tupleDesc,
-                    resultMap.entrySet().stream()
-                            .map(x -> {
-                                        Tuple tuple = new Tuple(tupleDesc);
-                                        tuple.setField(0, x.getKey());
-                                        tuple.setField(1, new IntField(x.getValue()));
-                                        tuple.setField(2, new IntField(countMap.get(x.getKey())));
-                                        return tuple;
-                                    }
-                            ).collect(Collectors.toList())
-            );
+            return Aggregator.getOpIterator(gbfieldtype, resultMap, countMap);
         } else {
-            TupleDesc tupleDesc = new TupleDesc(new Type[]{this.gbfieldtype, Type.INT_TYPE});
-            return new TupleIterator(
-                    tupleDesc,
-                    resultMap.entrySet().stream()
-//                            .sorted(Comparator.comparingInt(Map.Entry::getValue))
-                            .map(
-                                    x -> {
-                                        Tuple tuple = new Tuple(tupleDesc);
-                                        tuple.setField(0, x.getKey());
-                                        tuple.setField(1, new IntField(x.getValue()));
-                                        return tuple;
-                                    }
-                            ).collect(Collectors.toList())
-            );
+            return Aggregator.getOpIterator(gbfieldtype, resultMap);
         }
     }
 }
