@@ -21,6 +21,8 @@ public class HeapPage implements Page {
     byte[] oldData;
     private final Byte oldDataLock = new Byte((byte) 0);
 
+    TransactionId dirtyTransactionId;
+
     /**
      * Create a HeapPage from a set of bytes of data read from disk.
      * The format of a HeapPage is a set of header bytes indicating
@@ -265,8 +267,8 @@ public class HeapPage implements Page {
     public void insertTuple(Tuple t) throws DbException {
         // some code goes here
         // not necessary for lab1
-
-        if (header.length * 8 - this.getNumEmptySlots() >= numSlots) {
+        System.out.println(getNumUsedSlots());
+        if (getNumUsedSlots() >= numSlots) {
             throw new DbException("the page is full.");
         }
         if (!this.td.equals(t.getTupleDesc())) {
@@ -281,7 +283,7 @@ public class HeapPage implements Page {
         markSlotUsed(unusedSlot, true);
     }
 
-    static final byte[] log = {0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, (byte) 0x80};
+    static final byte[] log = {1, 2, 4, 8, 16, 32, 64, (byte) 0x80};
 
     private int getUnusedSlot() {
         for (int i = 0; i < header.length; i++) {
@@ -303,6 +305,7 @@ public class HeapPage implements Page {
     public void markDirty(boolean dirty, TransactionId tid) {
         // some code goes here
         // not necessary for lab1
+        this.dirtyTransactionId = dirty ? tid : null;
     }
 
     /**
@@ -311,7 +314,7 @@ public class HeapPage implements Page {
     public TransactionId isDirty() {
         // some code goes here
         // Not necessary for lab1
-        return null;
+        return this.dirtyTransactionId;
     }
 
     /**
@@ -339,13 +342,18 @@ public class HeapPage implements Page {
 
     public int getNumEmptySlots() {
         // some code goes here
+//        return header.length * 8 - getNumUsedSlots();
+        return getNumTuples() - getNumUsedSlots();
+    }
+
+    public int getNumUsedSlots() {
         int sum = 0;
         for (int i = 0; i < header.length; i++) {
             sum += table[header[i] & 0xff]
             //  + table[(header[i] >> 8) & 0xff] + table[(header[i] >> 16) & 0xff] + table[(header[i] >> 24) & 0xff]
             ;
         }
-        return header.length * 8 - sum;
+        return sum;
     }
 
     /**
