@@ -246,6 +246,12 @@ public class HeapPage implements Page {
     public void deleteTuple(Tuple t) throws DbException {
         // some code goes here
         // not necessary for lab1
+        RecordId recordId = t.getRecordId();
+        if (!recordId.getPageId().equals(this.pid) || !isSlotUsed(recordId.tupleNo)) {
+            throw new DbException("this tuple is not on this page");
+        }
+        this.tuples[recordId.getTupleNumber()] = null;
+        this.markSlotUsed(recordId.getTupleNumber(), false);
     }
 
     /**
@@ -259,6 +265,35 @@ public class HeapPage implements Page {
     public void insertTuple(Tuple t) throws DbException {
         // some code goes here
         // not necessary for lab1
+
+        if (header.length * 8 - this.getNumEmptySlots() >= numSlots) {
+            throw new DbException("the page is full.");
+        }
+        if (!this.td.equals(t.getTupleDesc())) {
+            throw new DbException("tuple descriptor is mismatch.");
+        }
+        int unusedSlot = getUnusedSlot();
+        if (unusedSlot == -1) {
+            throw new DbException("this should not happen");
+        }
+        t.setRecordId(new RecordId(this.pid, unusedSlot));
+        tuples[unusedSlot] = t;
+        markSlotUsed(unusedSlot, true);
+    }
+
+    static final byte[] log = {0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, (byte) 0x80};
+
+    private int getUnusedSlot() {
+        for (int i = 0; i < header.length; i++) {
+            if (!(header[i] == (byte) 0xff)) {
+                for (int j = 0; j < 8; j++) {
+                    if ((header[i] & log[j]) == 0) {
+                        return i * 8 + j;
+                    }
+                }
+            }
+        }
+        return -1;
     }
 
     /**
@@ -282,32 +317,33 @@ public class HeapPage implements Page {
     /**
      * Returns the number of empty slots on this page.
      */
-    final static int table[] = new int[]
-    { 
-        0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4, 
-        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5, 
-        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5, 
-        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 
-        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5, 
-        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 
-        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 
-        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7, 
-        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5, 
-        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 
-        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 
-        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7, 
-        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 
-        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7, 
-        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7, 
-        4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8, 
-    }; 
+    final static int[] table = new int[]
+            {
+                    0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,
+                    1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
+                    1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
+                    2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+                    1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
+                    2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+                    2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+                    3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
+                    1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
+                    2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+                    2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+                    3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
+                    2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+                    3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
+                    3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
+                    4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8,
+            };
+
     public int getNumEmptySlots() {
         // some code goes here
         int sum = 0;
         for (int i = 0; i < header.length; i++) {
             sum += table[header[i] & 0xff]
             //  + table[(header[i] >> 8) & 0xff] + table[(header[i] >> 16) & 0xff] + table[(header[i] >> 24) & 0xff]
-             ;
+            ;
         }
         return header.length * 8 - sum;
     }
@@ -317,7 +353,7 @@ public class HeapPage implements Page {
      */
     public boolean isSlotUsed(int i) {
         // some code goes here
-        return ((int)(header[i / 8]) & (1 << (i % 8))) != 0;
+        return ((int) (header[i / 8]) & (1 << (i % 8))) != 0;
     }
 
     /**
@@ -326,27 +362,39 @@ public class HeapPage implements Page {
     private void markSlotUsed(int i, boolean value) {
         // some code goes here
         // not necessary for lab1
-    } /**
+        byte b = (byte) (1 << (i % 8));
+        if (value) {
+            header[i / 8] = (byte) (header[i / 8] | b);
+        } else {
+            header[i / 8] = (byte) (header[i / 8] & ~b);
+        }
+    }
+
+    /**
      * @return an iterator over all tuples on this page (calling remove on this iterator throws an UnsupportedOperationException)
      * (note that this iterator shouldn't return tuples in empty slots!)
      */
     public Iterator<Tuple> iterator() {
         // some code goes here
-        return new Iterator<Tuple>() {
-            int current = 0;
-            public boolean hasNext() {
-                while(current < tuples.length) {
-                    if(isSlotUsed(current)) {
-                        return true;
-                    }
-                    current++;
-                }
-                return false;
-            };
-            public Tuple next() {
-                return tuples[current++];
-            };
-        } ;
+//        return new Iterator<Tuple>() {
+//            int current = 0;
+
+//            public boolean hasNext() {
+//                while (current < tuples.length) {
+//                    if (isSlotUsed(current)) {
+//                        return true;
+//                    }
+//                    current++;
+//                }
+//                return false;
+//            }
+//
+//            public Tuple next() {
+//                return tuples[current++];
+//            }
+//        };
+
+        return Arrays.stream(this.tuples).filter(Objects::nonNull).iterator();
     }
 }
 
