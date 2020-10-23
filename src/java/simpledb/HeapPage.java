@@ -267,7 +267,6 @@ public class HeapPage implements Page {
     public void insertTuple(Tuple t) throws DbException {
         // some code goes here
         // not necessary for lab1
-        System.out.println(getNumUsedSlots());
         if (getNumUsedSlots() >= numSlots) {
             throw new DbException("the page is full.");
         }
