@@ -21,7 +21,6 @@ public class HeapFileWriteTest extends TestUtil.CreateHeapFile {
     @After public void tearDown() throws Exception {
         Database.getBufferPool().transactionComplete(tid);
     }
-
     /**
      * Unit test for HeapFile.addTuple()
      */
@@ -46,6 +45,7 @@ public class HeapFileWriteTest extends TestUtil.CreateHeapFile {
     /**
      * JUnit suite target
      */
+
     public static junit.framework.Test suite() {
         return new JUnit4TestAdapter(HeapFileWriteTest.class);
     }

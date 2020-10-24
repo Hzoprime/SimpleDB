@@ -115,7 +115,7 @@ public class HeapFile implements DbFile {
         return arrayList;
     }
 
-    // TODO: 2020/10/22   this new page is not in buffer pool and not in hard disk
+    // TODO: 2020/10/22  this new page is not in buffer pool and not in hard disk
     private Page getInsertablePage(TransactionId transactionId) throws TransactionAbortedException, DbException, IOException {
         for (int i = 0; i < numPage; i++) {
             HeapPageId heapPageId = new HeapPageId(getId(), i);
@@ -124,9 +124,15 @@ public class HeapFile implements DbFile {
                 return heapPage;
             }
         }
+        return createBlankPage(transactionId);
+    }
+
+
+    private Page createBlankPage(TransactionId transactionId) throws IOException, TransactionAbortedException, DbException {
         HeapPageId heapPageId = new HeapPageId(getId(), numPage);
         numPage++;
         HeapPage heapPage = new HeapPage(heapPageId, HeapPage.createEmptyPageData());
+        // dump to disk, so the buffer pool can get it from disk through readPage
         writePage(heapPage);
         heapPage = (HeapPage) Database.getBufferPool().getPage(transactionId, heapPageId, Permissions.READ_WRITE);
         return heapPage;
@@ -142,6 +148,7 @@ public class HeapFile implements DbFile {
         HeapPage heapPage = (HeapPage) Database.getBufferPool().getPage(tid, recordId.getPageId(), Permissions.READ_WRITE);
         heapPage.deleteTuple(t);
         arrayList.add(heapPage);
+        heapPage.markDirty(true, tid);
         return arrayList;
     }
 
@@ -206,6 +213,5 @@ public class HeapFile implements DbFile {
             }
         };
     }
-
 }
 

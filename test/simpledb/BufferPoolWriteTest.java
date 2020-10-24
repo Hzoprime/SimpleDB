@@ -51,6 +51,7 @@ public class BufferPoolWriteTest extends TestUtil.CreateHeapFile {
     /**
      * Set up initial resources for each unit test.
      */
+
     @Before public void setUp() throws Exception {
         super.setUp();
         tid = new TransactionId();

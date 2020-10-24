@@ -31,6 +31,7 @@ public class HeapPageWriteTest extends SimpleDbTestBase {
     /**
      * Unit test for HeapPage.isDirty()
      */
+
     @Test public void testDirty() throws Exception {
         TransactionId tid = new TransactionId();
         HeapPage page = new HeapPage(pid, HeapPageReadTest.EXAMPLE_DATA);
@@ -38,7 +39,6 @@ public class HeapPageWriteTest extends SimpleDbTestBase {
         TransactionId dirtier = page.isDirty();
         assertEquals(true, dirtier != null);
         assertEquals(true, dirtier == tid);
-
         page.markDirty(false, tid);
         dirtier = page.isDirty();
         assertEquals(false, dirtier != null);
@@ -47,6 +47,7 @@ public class HeapPageWriteTest extends SimpleDbTestBase {
     /**
      * Unit test for HeapPage.addTuple()
      */
+
     @Test public void addTuple() throws Exception {
         HeapPage page = new HeapPage(pid, HeapPageReadTest.EXAMPLE_DATA);
         int free = page.getNumEmptySlots();
