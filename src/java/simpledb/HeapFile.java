@@ -114,8 +114,17 @@ public class HeapFile implements DbFile {
         arrayList.add(heapPage);
         return arrayList;
     }
+    /*
+     * Lab 2
+     * If no such pages exist in the HeapFile,
+     * you need to create a new page and append it to the *physical* file on disk.
+     * You will need to ensure that the RecordID in the tuple is updated correctly.
+     */
+    /*
+     * However, HeapFileDuplicates which extends HeapFile in BufferPoolWriteTest do not
+     * implement this feature mentioned above.
+     */
 
-    // TODO: 2020/10/22  this new page is not in buffer pool and not in hard disk
     private Page getInsertablePage(TransactionId transactionId) throws TransactionAbortedException, DbException, IOException {
         for (int i = 0; i < numPage; i++) {
             HeapPageId heapPageId = new HeapPageId(getId(), i);

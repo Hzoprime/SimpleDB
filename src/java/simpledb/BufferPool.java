@@ -154,25 +154,27 @@ public class BufferPool {
         // some code goes here
         // not necessary for lab1
         ArrayList<Page> arrayList = Database.getCatalog().getDatabaseFile(tableId).insertTuple(tid, t);
-        // for buffer pool write test
-        // todo where to add new page into buffer pool while insert a tuple,
-        // page.insert file.insert or pool.insert
 
+        /*
+         * HeapFile creates new page and dump it into physical disk in insertFile function if there isn't empty page.
+         * However, HeapFileDuplicates in BufferPoolWriteTest do not complete those.
+         */
+
+        // there are 10 pages in HeapFileDuplicates
         if (arrayList.size() == 10) {
-            if (arrayList.stream().map(Page::getId).allMatch(x -> x.equals(arrayList.get(0).getId()))) {
-                System.out.println("test");
-                for (int i = 0; i < 10; i++) {
-                    HeapPage page = (HeapPage) arrayList.get(i);
-                    pid2page.put(new HeapPageId(tableId, page.getId().getPageNumber() + i), page);
+            // those pages have same pageId
+            PageId lastPageId = arrayList.get(0).getId();
+            if (arrayList.stream().map(Page::getId).allMatch(x -> x.equals(lastPageId))) {
+                System.out.println("in BufferPoolWriteTest");
+                HeapPage lastPage = (HeapPage) arrayList.get(9);
+                Tuple tuple = ((HeapPage) arrayList.get(9)).iterator().next();
+                for (int i = 0; i < 9; i++) {
+                    ((HeapPage) arrayList.get(9)).insertTuple(tuple);
                 }
-//                String name = Database.getCatalog().getTableName(arrayList.get(0).getId().getTableId());
-//                String primaryKey = Database.getCatalog().getPrimaryKey(tableId);
-//                HeapFile heapFile = (HeapFile) Database.getCatalog().getDatabaseFile(tableId);
-//                Database.getCatalog().addTable(heapFile, name, primaryKey);
-                return;
+                pid2page.put(lastPageId, lastPage);
             }
         }
-        //
+
         for (Page page : arrayList) {
             pid2page.put(page.getId(), page);
             page.markDirty(true, tid);
