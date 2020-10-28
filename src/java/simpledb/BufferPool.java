@@ -2,9 +2,7 @@ package simpledb;
 
 import java.io.*;
 
-import java.util.ArrayList;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.*;
 
 /**
  * BufferPool manages the reading and writing of pages into memory from
@@ -32,9 +30,13 @@ public class BufferPool {
      */
     public static final int DEFAULT_PAGES = 50;
 
-    public int numPage;
+    public final int numPage;
 
-    private final ConcurrentHashMap<PageId, Page> pid2page;
+    private final Map<PageId, Page> pid2page;
+
+    LinkedHashMap<PageId, Page> linkedHashMap;
+
+    private static final float MAP_LOAD_FACTOR = 0.75f;
 
     /**
      * Creates a BufferPool that caches up to numPages pages.
@@ -44,7 +46,14 @@ public class BufferPool {
     public BufferPool(int numPages) {
         // some code goes here
         this.numPage = numPages;
-        pid2page = new ConcurrentHashMap<>(numPages);
+        linkedHashMap = new LinkedHashMap<PageId, Page>(numPages, MAP_LOAD_FACTOR, true) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry eldest) {
+                return size() > numPage;
+            }
+        };
+        // pid2page = new ConcurrentHashMap<>(numPages);
+        pid2page = Collections.synchronizedMap(linkedHashMap);
     }
 
     public static int getPageSize() {
@@ -84,7 +93,7 @@ public class BufferPool {
         }
         HeapFile file = (HeapFile) Database.getCatalog().getDatabaseFile(pid.getTableId());
         HeapPage newPage = (HeapPage) file.readPage(pid);
-        pid2page.put(pid, newPage);
+        Page oldPage = pid2page.put(pid, newPage);
         return newPage;
     }
 
@@ -226,6 +235,7 @@ public class BufferPool {
     public synchronized void discardPage(PageId pid) {
         // some code goes here
         // not necessary for lab1
+
     }
 
     /**
@@ -236,6 +246,12 @@ public class BufferPool {
     private synchronized void flushPage(PageId pid) throws IOException {
         // some code goes here
         // not necessary for lab1
+        Page page = linkedHashMap.get(pid);
+        if (page == null || page.isDirty() == null) {
+            return;
+        }
+        DbFile file = Database.getCatalog().getDatabaseFile(pid.getTableId());
+        file.writePage(page);
     }
 
     /**
@@ -250,6 +266,8 @@ public class BufferPool {
      * Discards a page from the buffer pool.
      * Flushes the page to disk to ensure dirty pages are updated on disk.
      */
+
+    @Deprecated
     private synchronized void evictPage() throws DbException {
         // some code goes here
         // not necessary for lab1
