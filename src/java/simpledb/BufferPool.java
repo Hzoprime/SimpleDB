@@ -220,7 +220,9 @@ public class BufferPool {
     public synchronized void flushAllPages() throws IOException {
         // some code goes here
         // not necessary for lab1
-
+        for (PageId pageId : linkedHashMap.keySet()) {
+            flushPage(pageId);
+        }
     }
 
     /**
@@ -235,7 +237,7 @@ public class BufferPool {
     public synchronized void discardPage(PageId pid) {
         // some code goes here
         // not necessary for lab1
-
+        linkedHashMap.remove(pid);
     }
 
     /**
