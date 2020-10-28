@@ -29,6 +29,7 @@ public class Insert extends Operator {
     int tableId;
     TransactionId transactionId;
     TupleDesc tupleDesc;
+    boolean hasAccess;
 
     public Insert(TransactionId t, OpIterator child, int tableId)
             throws DbException {
@@ -42,6 +43,7 @@ public class Insert extends Operator {
         if (!tableDesc.equals(childTupleDesc)) {
             throw new DbException("TupleDesc of child differs from table into which we are to insert.");
         }
+        hasAccess = false;
     }
 
     public TupleDesc getTupleDesc() {
@@ -53,7 +55,6 @@ public class Insert extends Operator {
         // some code goes here
         super.open();
         child.open();
-
     }
 
     public void close() {
@@ -82,21 +83,22 @@ public class Insert extends Operator {
      */
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
         // some code goes here
+        if (hasAccess) {
+            return null;
+        }
         int count = 0;
         while (child.hasNext()) {
             try {
                 Database.getBufferPool().insertTuple(transactionId, tableId, child.next());
-                count ++;
+                count++;
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
-        if (count != 0) {
-            Tuple tuple = new Tuple(new TupleDesc(new Type[]{Type.INT_TYPE}));
-            tuple.setField(0, new IntField(count));
-            return tuple;
-        }
-        return null;
+        Tuple tuple = new Tuple(tupleDesc);
+        tuple.setField(0, new IntField(count));
+        hasAccess = true;
+        return tuple;
     }
 
     @Override
