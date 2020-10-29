@@ -2,6 +2,8 @@ package simpledb;
 
 import java.util.*;
 
+import static simpledb.Aggregator.NO_GROUPING;
+
 /**
  * The Aggregation operator that computes an aggregate (e.g., sum, avg, max,
  * min). Note that we only support aggregates over a single column, grouped by a
@@ -40,10 +42,14 @@ public class Aggregate extends Operator {
         this.gfield = gfield;
         this.aop = aop;
         this.tupleDesc = child.getTupleDesc();
+        Type gFieldType = null;
+        if (gfield != NO_GROUPING) {
+            gFieldType = tupleDesc.getFieldType(gfield);
+        }
         if (this.tupleDesc.getFieldType(afield) == Type.INT_TYPE) {
-            aggregator = new IntegerAggregator(gfield, tupleDesc.getFieldType(gfield), afield, aop);
+            aggregator = new IntegerAggregator(gfield, gFieldType, afield, aop);
         } else {
-            aggregator = new StringAggregator(gfield, tupleDesc.getFieldType(gfield), afield, aop);
+            aggregator = new StringAggregator(gfield, gFieldType, afield, aop);
         }
 
     }
@@ -65,7 +71,7 @@ public class Aggregate extends Operator {
      */
     public String groupFieldName() {
         // some code goes here
-        if (gfield != Aggregator.NO_GROUPING) {
+        if (gfield != NO_GROUPING) {
             return null;
         }
         return tupleDesc.getFieldName(gfield);

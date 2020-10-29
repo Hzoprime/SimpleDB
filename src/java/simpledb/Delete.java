@@ -22,6 +22,7 @@ public class Delete extends Operator {
     TransactionId transactionId;
     OpIterator child;
     TupleDesc tupleDesc;
+    boolean hasAccess;
 
 
     public Delete(TransactionId t, OpIterator child) {
@@ -29,6 +30,7 @@ public class Delete extends Operator {
         this.transactionId = t;
         this.child = child;
         this.tupleDesc = new TupleDesc(new Type[]{Type.INT_TYPE});
+        hasAccess = false;
     }
 
     public TupleDesc getTupleDesc() {
@@ -63,6 +65,9 @@ public class Delete extends Operator {
      * @see BufferPool#deleteTuple
      */
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
+        if (hasAccess) {
+            return null;
+        }
         // some code goes here
         int count = 0;
         while (child.hasNext()) {
@@ -75,6 +80,7 @@ public class Delete extends Operator {
         }
         Tuple tuple = new Tuple(tupleDesc);
         tuple.setField(0, new IntField(count));
+        hasAccess = true;
         return tuple;
     }
 

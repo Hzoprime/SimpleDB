@@ -220,8 +220,9 @@ public class BufferPool {
     public synchronized void flushAllPages() throws IOException {
         // some code goes here
         // not necessary for lab1
-        for (PageId pageId : linkedHashMap.keySet()) {
-            flushPage(pageId);
+        int i = 0;
+        for (Page page : linkedHashMap.values()) {
+            flushPage(page);
         }
     }
 
@@ -240,11 +241,21 @@ public class BufferPool {
         linkedHashMap.remove(pid);
     }
 
+    private synchronized void flushPage(Page page) throws IOException {
+        if (page == null || page.isDirty() == null) {
+            return;
+        }
+        DbFile file = Database.getCatalog().getDatabaseFile(page.getId().getTableId());
+        file.writePage(page);
+    }
+
     /**
      * Flushes a certain page to disk
      *
      * @param pid an ID indicating the page to flush
      */
+
+    @Deprecated
     private synchronized void flushPage(PageId pid) throws IOException {
         // some code goes here
         // not necessary for lab1

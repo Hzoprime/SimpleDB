@@ -1,6 +1,7 @@
 package simpledb;
 
 
+import java.awt.event.MouseListener;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -70,6 +71,9 @@ public class IntegerAggregator implements Aggregator {
 
     private int getNewValue(Integer oldValue, int newValue) {
         if (oldValue == null) {
+            if (what == Op.COUNT) {
+                return 1;
+            }
             return newValue;
         }
         switch (what) {
