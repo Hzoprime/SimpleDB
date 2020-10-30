@@ -91,8 +91,8 @@ public class BufferPool {
         if (pid2page.containsKey(pid)) {
             return pid2page.get(pid);
         }
-        HeapFile file = (HeapFile) Database.getCatalog().getDatabaseFile(pid.getTableId());
-        HeapPage newPage = (HeapPage) file.readPage(pid);
+        DbFile file = Database.getCatalog().getDatabaseFile(pid.getTableId());
+        Page newPage = file.readPage(pid);
         Page oldPage = pid2page.put(pid, newPage);
         return newPage;
     }

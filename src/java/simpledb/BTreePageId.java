@@ -70,8 +70,7 @@ public class BTreePageId implements PageId {
 	 * @see BufferPool
 	 */
 	public int hashCode() {
-		int code = (tableId << 16) + (pgNo << 2) + pgcateg;
-		return code;
+		return (tableId << 16) + (pgNo << 2) + pgcateg;
 	}
 
 	/**
