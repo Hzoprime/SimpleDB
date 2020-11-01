@@ -83,7 +83,7 @@ public class BTreeFile implements DbFile {
         try {
             bis = new BufferedInputStream(new FileInputStream(f));
             if (id.pgcateg() == BTreePageId.ROOT_PTR) {
-                byte pageBuf[] = new byte[BTreeRootPtrPage.getPageSize()];
+                byte[] pageBuf = new byte[BTreeRootPtrPage.getPageSize()];
                 int retval = bis.read(pageBuf, 0, BTreeRootPtrPage.getPageSize());
                 if (retval == -1) {
                     throw new IllegalArgumentException("Read past end of table");
@@ -269,8 +269,47 @@ public class BTreeFile implements DbFile {
         // the new entry.  getParentWithEmtpySlots() will be useful here.  Don't forget to update
         // the sibling pointers of all the affected leaf pages.  Return the page into which a
         // tuple with the given key field should be inserted.
-        return null;
+        BTreeLeafPage newRightPage = (BTreeLeafPage) getEmptyPage(tid, dirtypages, BTreePageId.LEAF);
+        Iterator<Tuple> iterator = page.reverseIterator();
+        Tuple[] tuples = new Tuple[(page.getNumTuples() + 1) / 2];
+        int count = tuples.length - 1;
+        while (count >= 0 && iterator.hasNext()) {
+            tuples[count--] = iterator.next();
+        }
+        for (Tuple tuple : tuples) {
+            page.deleteTuple(tuple);
+            newRightPage.insertTuple(tuple);
+        }
 
+        Field midKey = tuples[0].getField(keyField);
+        BTreeInternalPage parent = getParentWithEmptySlots(tid, dirtypages, page.getParentId(), midKey);
+
+        BTreePageId oldRightId = page.getRightSiblingId();
+
+        newRightPage.setRightSiblingId(oldRightId);
+        newRightPage.setLeftSiblingId(page.getId());
+        page.setRightSiblingId(newRightPage.getId());
+
+        newRightPage.setParentId(parent.getId());
+        page.setParentId(parent.getId());
+
+        BTreeEntry entry = new BTreeEntry(midKey, page.getId(), newRightPage.getId());
+        parent.insertEntry(entry);
+
+        if (oldRightId != null) {
+            BTreeLeafPage oldRightPage = (BTreeLeafPage) getPage(tid, dirtypages, oldRightId, Permissions.READ_WRITE);
+            oldRightPage.setLeftSiblingId(newRightPage.getId());
+            dirtypages.put(oldRightId, oldRightPage);
+        }
+
+        dirtypages.put(parent.getId(), parent);
+        dirtypages.put(page.getId(), page);
+        dirtypages.put(newRightPage.getId(), newRightPage);
+
+        if (field.compare(Op.GREATER_THAN, midKey)) {
+            return newRightPage;
+        }
+        return page;
     }
 
     /**
@@ -306,7 +345,39 @@ public class BTreeFile implements DbFile {
         // the parent pointers of all the children moving to the new page.  updateParentPointers()
         // will be useful here.  Return the page into which an entry with the given key field
         // should be inserted.
-        return null;
+        BTreeInternalPage newInternalPage = (BTreeInternalPage) getEmptyPage(tid, dirtypages, BTreePageId.INTERNAL);
+        BTreeEntry[] entries = new BTreeEntry[(page.getNumEntries() + 1) / 2];
+        Iterator<BTreeEntry> iterator = page.reverseIterator();
+        int count = entries.length - 1;
+        while (count >= 0 && iterator.hasNext()) {
+            entries[count--] = iterator.next();
+        }
+
+        for (int i = entries.length - 1; i > 0; i++) {
+            page.deleteKeyAndRightChild(entries[i]);
+            newInternalPage.insertEntry(entries[i]);
+            updateParentPointer(tid, dirtypages, newInternalPage.getId(), entries[i].getRightChild());
+        }
+        BTreeEntry midKey = entries[0];
+        page.deleteKeyAndRightChild(entries[0]);
+
+        midKey.setLeftChild(page.getId());
+        midKey.setRightChild(newInternalPage.getId());
+
+        BTreeInternalPage parent =  getParentWithEmptySlots(tid, dirtypages, page.getParentId(), midKey.getKey());
+        parent.insertEntry(midKey);
+
+        newInternalPage.setParentId(parent.getId());
+        page.setParentId(parent.getId());
+
+        dirtypages.put(page.getId(), page);
+        dirtypages.put(parent.getId(), parent);
+        dirtypages.put(newInternalPage.getId(), newInternalPage);
+
+        if (field.compare(Op.GREATER_THAN, midKey.getKey())) {
+            return newInternalPage;
+        }
+        return page;
     }
 
     /**
