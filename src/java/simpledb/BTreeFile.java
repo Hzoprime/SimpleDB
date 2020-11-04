@@ -294,7 +294,15 @@ public class BTreeFile implements DbFile {
         page.setParentId(parent.getId());
 
         BTreeEntry entry = new BTreeEntry(midKey, page.getId(), newRightPage.getId());
-        parent.insertEntry(entry);
+        try {
+            parent.insertEntry(entry);
+        } catch (DbException e) {
+            System.out.println(entry);
+            for (int i = 0; i < parent.getNumEntries(); i++) {
+                System.out.println(parent.getChildId(i));
+            }
+            throw e;
+        }
 
         if (oldRightId != null) {
             BTreeLeafPage oldRightPage = (BTreeLeafPage) getPage(tid, dirtypages, oldRightId, Permissions.READ_WRITE);
@@ -353,18 +361,20 @@ public class BTreeFile implements DbFile {
             entries[count--] = iterator.next();
         }
 
-        for (int i = entries.length - 1; i > 0; i++) {
+        for (int i = entries.length - 1; i > 0; i--) {
             page.deleteKeyAndRightChild(entries[i]);
             newInternalPage.insertEntry(entries[i]);
             updateParentPointer(tid, dirtypages, newInternalPage.getId(), entries[i].getRightChild());
         }
+
         BTreeEntry midKey = entries[0];
+        updateParentPointer(tid, dirtypages, newInternalPage.getId(), midKey.getRightChild());
         page.deleteKeyAndRightChild(entries[0]);
 
         midKey.setLeftChild(page.getId());
         midKey.setRightChild(newInternalPage.getId());
 
-        BTreeInternalPage parent =  getParentWithEmptySlots(tid, dirtypages, page.getParentId(), midKey.getKey());
+        BTreeInternalPage parent = getParentWithEmptySlots(tid, dirtypages, page.getParentId(), midKey.getKey());
         parent.insertEntry(midKey);
 
         newInternalPage.setParentId(parent.getId());
