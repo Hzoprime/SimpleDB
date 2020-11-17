@@ -5,6 +5,8 @@ import java.util.*;
 
 import simpledb.Predicate.Op;
 
+import javax.management.MBeanFeatureInfo;
+
 /**
  * BTreeFile is an implementation of a DbFile that stores a B+ tree.
  * Specifically, it stores a pointer to a root page,
@@ -670,6 +672,35 @@ public class BTreeFile implements DbFile {
         // Move some of the tuples from the sibling to the page so
         // that the tuples are evenly distributed. Be sure to update
         // the corresponding parent entry.
+
+        int tupleToMoveNumber = (sibling.getNumTuples() - page.getNumTuples()) / 2;
+
+        Tuple[] tuplesToMove = new Tuple[tupleToMoveNumber];
+
+        int count = tupleToMoveNumber - 1;
+        Iterator<Tuple> tupleIterator;
+
+        if (isRightSibling) {
+            tupleIterator = sibling.iterator();
+        } else {
+            tupleIterator = sibling.reverseIterator();
+        }
+
+        while (count >= 0 && tupleIterator.hasNext()) {
+            tuplesToMove[count--] = tupleIterator.next();
+        }
+
+        for (Tuple tuple : tuplesToMove) {
+            sibling.deleteTuple(tuple);
+            page.insertTuple(tuple);
+        }
+
+        if (isRightSibling) {
+            entry.setKey(sibling.getTuple(0).getField(keyField));
+        } else {
+            entry.setKey(page.getTuple(0).getField(keyField));
+        }
+        parent.updateEntry(entry);
     }
 
     /**
@@ -745,6 +776,39 @@ public class BTreeFile implements DbFile {
         // that the entries are evenly distributed. Be sure to update
         // the corresponding parent entry. Be sure to update the parent
         // pointers of all children in the entries that were moved.
+
+        int tupleToMoveNumber = (leftSibling.getNumEntries() - page.getNumEntries()) / 2;
+        BTreeEntry[] entries = new BTreeEntry[tupleToMoveNumber];
+
+        Iterator<BTreeEntry> iterator = leftSibling.reverseIterator();
+        int count = tupleToMoveNumber - 1;
+
+        while (count >= 0 && iterator.hasNext()) {
+            entries[count] = iterator.next();
+            leftSibling.deleteKeyAndRightChild(entries[count--]);
+        }
+
+        Field newKey = entries[0].getKey();
+
+        entries[0].setKey(parentEntry.getKey());
+        entries[0].setLeftChild(entries[entries.length - 1].getRightChild());
+        entries[0].setRightChild(page.getChildId(0));
+
+        page.insertEntry(entries[0]);
+//        updateParentPointer(tid, dirtypages, page.getId(), entries[0].getLeftChild());
+
+        for (int i = entries.length - 1; i > 0; i--) {
+            page.insertEntry(entries[i]);
+//            updateParentPointer(tid, dirtypages, page.getId(), entries[i].getLeftChild());
+        }
+        updateParentPointers(tid, dirtypages, page);
+        parentEntry.setKey(newKey);
+        parent.updateEntry(parentEntry);
+
+        dirtypages.put(parent.getId(), parent);
+        dirtypages.put(page.getId(), page);
+        dirtypages.put(leftSibling.getId(), leftSibling);
+
     }
 
     /**
@@ -772,6 +836,35 @@ public class BTreeFile implements DbFile {
         // that the entries are evenly distributed. Be sure to update
         // the corresponding parent entry. Be sure to update the parent
         // pointers of all children in the entries that were moved.
+
+
+        int tupleToMoveNumber = (rightSibling.getNumEntries() - page.getNumEntries()) / 2;
+        BTreeEntry[] entries = new BTreeEntry[tupleToMoveNumber];
+
+        Iterator<BTreeEntry> iterator = rightSibling.iterator();
+        int count = 0;
+        while (count < tupleToMoveNumber && iterator.hasNext()) {
+            entries[count] = iterator.next();
+            rightSibling.deleteKeyAndLeftChild(entries[count++]);
+        }
+
+        Field newKey = entries[entries.length - 1].getKey();
+
+        entries[entries.length - 1].setKey(parentEntry.getKey());
+        entries[entries.length - 1].setLeftChild(page.getChildId(page.getNumEntries()));
+        entries[entries.length - 1].setRightChild(entries[0].getLeftChild());
+
+        page.insertEntry(entries[entries.length - 1]);
+//        updateParentPointer(tid, dirtypages, page.getId(), entries[entries.length - 1].getRightChild());
+
+        for (int i = 0; i < entries.length - 1; i++) {
+            page.insertEntry(entries[1]);
+//            updateParentPointer(tid, dirtypages, page.getId(), entries[i].getRightChild());
+        }
+        updateParentPointers(tid, dirtypages, page);
+
+        parentEntry.setKey(newKey);
+        parent.updateEntry(parentEntry);
     }
 
     /**
@@ -801,6 +894,30 @@ public class BTreeFile implements DbFile {
         // the sibling pointers, and make the right page available for reuse.
         // Delete the entry in the parent corresponding to the two pages that are merging -
         // deleteParentEntry() will be useful here
+
+        int tupleToMoveNumber = rightPage.getNumTuples();
+
+        Tuple tuple;
+
+        Iterator<Tuple> iterator = rightPage.iterator();
+        int count = 0;
+        while (count < tupleToMoveNumber && iterator.hasNext()) {
+            tuple = iterator.next();
+            rightPage.deleteTuple(tuple);
+            leftPage.insertTuple(tuple);
+        }
+
+        BTreePageId newRightPageId = rightPage.getRightSiblingId();
+        leftPage.setRightSiblingId(newRightPageId);
+        if (newRightPageId != null) {
+            BTreeLeafPage newRightPage = (BTreeLeafPage) getPage(tid, dirtypages, newRightPageId, Permissions.READ_WRITE);
+            newRightPage.setLeftSiblingId(leftPage.getId());
+            dirtypages.put(newRightPageId, newRightPage);
+        }
+        dirtypages.put(leftPage.getId(), leftPage);
+        setEmptyPage(tid, dirtypages, rightPage.getId().getPageNumber());
+
+        deleteParentEntry(tid,dirtypages, leftPage, parent, parentEntry);
     }
 
     /**
@@ -833,6 +950,9 @@ public class BTreeFile implements DbFile {
         // and make the right page available for reuse
         // Delete the entry in the parent corresponding to the two pages that are merging -
         // deleteParentEntry() will be useful here
+
+
+
     }
 
     /**
