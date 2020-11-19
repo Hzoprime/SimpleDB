@@ -189,7 +189,7 @@ public class BTreeFileDeleteTest extends SimpleDbTestBase {
 				null, null, 0);
 		BTreeChecker.checkRep(bf, tid, new HashMap<PageId, Page>(), true);
 
-		Database.resetBufferPool(500); // we need more pages for this test
+		Database.resetBufferPool(1000); // we need more pages for this test
 
 		BTreeRootPtrPage rootPtr = (BTreeRootPtrPage) Database.getBufferPool().getPage(
 				tid, BTreeRootPtrPage.getId(bf.getId()), Permissions.READ_ONLY);
