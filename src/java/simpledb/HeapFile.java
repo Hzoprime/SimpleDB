@@ -30,7 +30,7 @@ public class HeapFile implements DbFile {
         // some code goes here
         file = f;
         tupleDesc = td;
-        numPage = (int) file.length() / BufferPool.getPageSize();
+        numPage = numPages();
     }
 
     /**
@@ -99,7 +99,7 @@ public class HeapFile implements DbFile {
      */
     public int numPages() {
         // some code goes here
-        return numPage;
+        return ((int)file.length() - 1 + BufferPool.getPageSize()) / BufferPool.getPageSize();
     }
 
     // see DbFile.java for javadocs
@@ -189,7 +189,7 @@ public class HeapFile implements DbFile {
                 if (iterator.hasNext()) {
                     return true;
                 }
-                while (pageNo < numPage - 1) {
+                while (pageNo < numPages() - 1) {
                     pageNo++;
                     HeapPageId heapPageId = new HeapPageId(getId(), pageNo);
                     HeapPage heapPage = (HeapPage) Database.getBufferPool().getPage(tid, heapPageId, Permissions.READ_ONLY);

@@ -887,13 +887,11 @@ public class BTreeFile implements DbFile {
         // Delete the entry in the parent corresponding to the two pages that are merging -
         // deleteParentEntry() will be useful here
 
-        int tupleToMoveNumber = rightPage.getNumTuples();
-
         Tuple tuple;
 
         Iterator<Tuple> iterator = rightPage.iterator();
-        int count = 0;
-        while (count < tupleToMoveNumber && iterator.hasNext()) {
+
+        while (iterator.hasNext()) {
             tuple = iterator.next();
             rightPage.deleteTuple(tuple);
             leftPage.insertTuple(tuple);
