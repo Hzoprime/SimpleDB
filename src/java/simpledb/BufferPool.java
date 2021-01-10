@@ -1,10 +1,8 @@
 package simpledb;
 
 import java.io.IOException;
-import java.lang.reflect.Array;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ThreadFactory;
 
 /**
  * BufferPool manages the reading and writing of pages into memory from
@@ -20,28 +18,17 @@ import java.util.concurrent.ThreadFactory;
 
 class LockManager {
     enum LockType {
-        SLock, XLock
+        ShareLock, ExclusiveLock
     }
 
-    class ObjLock {
-        // boolean blocked;
+    static class Lock {
         LockType type;
-        PageId obj;
+        PageId pageId;
         ArrayList<TransactionId> holders;
 
-        /*
-        public boolean isBlocked() {
-            return blocked;
-        }
-        public void setBlocked(boolean blocked) {
-            this.blocked = blocked;
-        }
-        */
-
-        public ObjLock(LockType t, PageId obj, ArrayList<TransactionId> holders) {
-            // this.blocked = false;
+        public Lock(LockType t, PageId pageId, ArrayList<TransactionId> holders) {
             this.type = t;
-            this.obj = obj;
+            this.pageId = pageId;
             this.holders = holders;
         }
 
@@ -53,24 +40,22 @@ class LockManager {
             return type;
         }
 
-        public PageId getObj() {
-            return obj;
+        public PageId getPageId() {
+            return pageId;
         }
 
         public ArrayList<TransactionId> getHolders() {
             return holders;
         }
 
-        public boolean tryUpgradeLock(TransactionId tid) {
-            if (type == LockType.SLock && holders.size() == 1 && holders.get(0).equals(tid)) {
-                type = LockType.XLock;
-                return true;
+        public void tryUpgradeLock(TransactionId tid) {
+            if (type == LockType.ShareLock && holders.size() == 1 && holders.get(0).equals(tid)) {
+                type = LockType.ExclusiveLock;
             }
-            return false;
         }
 
         public TransactionId addHolder(TransactionId tid) {
-            if (type == LockType.SLock) {
+            if (type == LockType.ShareLock) {
                 if (!holders.contains(tid)) {
                     holders.add(tid);
                 }
@@ -80,8 +65,8 @@ class LockManager {
         }
     }
 
-    private ConcurrentHashMap<PageId, ObjLock> lockTable;
-    private ConcurrentHashMap<TransactionId, ArrayList<PageId>> transactionTable;
+    private final ConcurrentHashMap<PageId, Lock> lockTable;
+    private final ConcurrentHashMap<TransactionId, ArrayList<PageId>> transactionTable;
 
     public LockManager(int lockTabCap, int transTabCap) {
         this.lockTable = new ConcurrentHashMap<>(lockTabCap);
@@ -96,21 +81,17 @@ class LockManager {
     private synchronized void block(PageId what, long start, long timeout)
             throws TransactionAbortedException {
         // activate blocking
-        // lockTable.get(what).setBlocked(true);
 
         if (System.currentTimeMillis() - start > timeout) {
-            // System.out.println(Thread.currentThread().getId() + ": aborted");
             throw new TransactionAbortedException();
         }
 
         try {
             wait(timeout);
             if (System.currentTimeMillis() - start > timeout) {
-                // System.out.println(Thread.currentThread().getId() + ": aborted");
                 throw new TransactionAbortedException();
             }
         } catch (InterruptedException e) {
-            /* do nothing */
             e.printStackTrace();
         }
     }
@@ -130,15 +111,14 @@ class LockManager {
 
     public synchronized void acquireLock(TransactionId tid, PageId pid, LockType reqLock, int maxTimeout)
             throws TransactionAbortedException {
-        // boolean isAcquired = false;
         long start = System.currentTimeMillis();
         Random rand = new Random();
-        long randomTimeout = rand.nextInt((maxTimeout - 0) + 1) + 0;
+        long randomTimeout = rand.nextInt((maxTimeout) + 1);
         while (true) {
             if (lockTable.containsKey(pid)) {
                 // page is locked by some transaction
-                if (lockTable.get(pid).getType() == LockType.SLock) {
-                    if (reqLock == LockType.SLock) {
+                if (lockTable.get(pid).getType() == LockType.ShareLock) {
+                    if (reqLock == LockType.ShareLock) {
                         updateTransactionTable(tid, pid);
                         assert lockTable.get(pid).addHolder(tid) != null;
                         // isAcquired = true;
@@ -175,16 +155,14 @@ class LockManager {
             } else {
                 ArrayList<TransactionId> initialHolders = new ArrayList<>();
                 initialHolders.add(tid);
-                lockTable.put(pid, new ObjLock(reqLock, pid, initialHolders));
+                lockTable.put(pid, new Lock(reqLock, pid, initialHolders));
                 updateTransactionTable(tid, pid);
-                // isAcquired = true;
                 return;
             }
         }
     }
 
     public synchronized void releaseLock(TransactionId tid, PageId pid) {
-
         // remove from trans table
         if (transactionTable.containsKey(tid)) {
             transactionTable.get(tid).remove(pid);
@@ -192,18 +170,14 @@ class LockManager {
                 transactionTable.remove(tid);
             }
         }
-
-        // remove from locktable
+        // remove from lock table
         if (lockTable.containsKey(pid)) {
             lockTable.get(pid).getHolders().remove(tid);
             if (lockTable.get(pid).getHolders().size() == 0) {
                 // no more threads are waiting here
                 lockTable.remove(pid);
             } else {
-                // ObjLock lock = lockTable.get(pid);
-                // synchronized (lock) {
                 notifyAll();
-                //}
             }
         }
     }
@@ -257,7 +231,8 @@ public class BufferPool {
         this.lockMgr = new LockManager(numPages, TRANSATION_FACTOR * numPages);
     }
 
-    public static int getPageSize() {
+    public static int
+    Size() {
         return pageSize;
     }
 
@@ -292,9 +267,9 @@ public class BufferPool {
 
         LockManager.LockType lockType;
         if (perm == Permissions.READ_ONLY) {
-            lockType = LockManager.LockType.SLock;
+            lockType = LockManager.LockType.ShareLock;
         } else {
-            lockType = LockManager.LockType.XLock;
+            lockType = LockManager.LockType.ExclusiveLock;
         }
         Debug.log(pid.toString() + ": before acquire lock\n");
         lockMgr.acquireLock(tid, pid, lockType, DEFAUT_MAXTIMEOUT);
